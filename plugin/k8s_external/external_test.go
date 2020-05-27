@@ -31,6 +31,8 @@ func TestExternal(t *testing.T) {
 		r := tc.Msg()
 		w := dnstest.NewRecorder(&test.ResponseWriter{})
 
+		e.upstream = &fakeUpstream{t, tc.Qname, fakeResponse}
+
 		_, err := e.ServeDNS(ctx, w, r)
 		if err != tc.Error {
 			t.Errorf("Test %d expected no error, got %v", i, err)
@@ -41,6 +43,7 @@ func TestExternal(t *testing.T) {
 		}
 
 		resp := w.Msg
+
 		if resp == nil {
 			t.Fatalf("Test %d, got nil message and no error for %q", i, r.Question[0].Name)
 		}
@@ -156,6 +159,8 @@ var tests = []test.Case{
 	{
 		Qname: "svc12.testns.example.com.", Qtype: dns.TypeA, Rcode: dns.RcodeSuccess,
 		Answer: []dns.RR{
+			test.A("dummy.hostname.	60 IN A 192.0.2.42"),
+			test.A("dummy.hostname.	60 IN A 192.0.2.43"),
 			test.CNAME("svc12.testns.example.com.	5	IN	CNAME	dummy.hostname"),
 		},
 	},
@@ -235,4 +240,30 @@ func (external) ServiceList() []*object.Service {
 func externalAddress(state request.Request) []dns.RR {
 	a := test.A("example.org. IN A 127.0.0.1")
 	return []dns.RR{a}
+}
+
+var fakeResponse = &dns.Msg{
+	MsgHdr: dns.MsgHdr{
+		Id:               43,
+		Opcode:           dns.OpcodeQuery,
+		RecursionDesired: true,
+		Rcode:            dns.RcodeSuccess,
+		Response:         true,
+	},
+	Question: []dns.Question{dns.Question{"dummy.hostname.", dns.TypeA, dns.ClassINET}},
+	Answer: []dns.RR{
+		test.A("dummy.hostname. 60 IN A 192.0.2.42"),
+		test.A("dummy.hostname. 60 IN A 192.0.2.43"),
+	},
+}
+
+type fakeUpstream struct {
+	t     *testing.T
+	qname string
+	resp  *dns.Msg
+}
+
+func (fu *fakeUpstream) Lookup(_ context.Context, _ request.Request, name string, typ uint16) (*dns.Msg, error) {
+
+	return fu.resp, nil
 }
