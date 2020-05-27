@@ -16,15 +16,11 @@ import (
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/etcd/msg"
+	"github.com/coredns/coredns/plugin/pkg/upstream"
 	"github.com/coredns/coredns/request"
 
 	"github.com/miekg/dns"
 )
-
-// UpstreamInt wraps the Upstream API for dependency injection during testing
-type UpstreamInt interface {
-	Lookup(ctx context.Context, state request.Request, name string, typ uint16) (*dns.Msg, error)
-}
 
 // Externaler defines the interface that a plugin should implement in order to be used by External.
 type Externaler interface {
@@ -44,7 +40,7 @@ type External struct {
 	apex       string
 	ttl        uint32
 
-	upstream UpstreamInt
+	upstream *upstream.Upstream
 
 	externalFunc     func(request.Request) ([]msg.Service, int)
 	externalAddrFunc func(request.Request) []dns.RR
