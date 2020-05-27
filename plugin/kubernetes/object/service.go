@@ -63,6 +63,7 @@ func toService(skipCleanup bool, svc *api.Service) *Service {
 	li := copy(s.ExternalIPs, svc.Spec.ExternalIPs)
 	for i, lb := range svc.Status.LoadBalancer.Ingress {
 		s.ExternalIPs[li+i] = lb.IP
+		s.ExternalIPs[li+i] = lb.Hostname
 	}
 
 	if !skipCleanup {
