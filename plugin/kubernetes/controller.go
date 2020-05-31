@@ -11,6 +11,7 @@ import (
 	"github.com/coredns/coredns/plugin/kubernetes/object"
 
 	api "k8s.io/api/core/v1"
+	ext "k8s.io/api/extensions/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,13 +22,18 @@ import (
 const (
 	podIPIndex            = "PodIP"
 	svcNameNamespaceIndex = "NameNamespace"
+	ingNameNamespaceIndex = "IngressNameNamespace"
 	svcIPIndex            = "ServiceIP"
+	ingHostIndex          = "IngressHost"
 	epNameNamespaceIndex  = "EndpointNameNamespace"
 	epIPIndex             = "EndpointsIP"
 )
 
 type dnsController interface {
 	ServiceList() []*object.Service
+	IngressList() []*object.Ingress
+	IngIndex(string) []*object.Ingress
+	IngIndexReverse(string) []*object.Ingress
 	EndpointsList() []*object.Endpoints
 	SvcIndex(string) []*object.Service
 	SvcIndexReverse(string) []*object.Service
@@ -58,11 +64,13 @@ type dnsControl struct {
 	namespaceSelector labels.Selector
 
 	svcController cache.Controller
+	ingController cache.Controller
 	podController cache.Controller
 	epController  cache.Controller
 	nsController  cache.Controller
 
 	svcLister cache.Indexer
+	ingLister cache.Indexer
 	podLister cache.Indexer
 	epLister  cache.Indexer
 	nsLister  cache.Store
@@ -114,6 +122,17 @@ func newdnsController(ctx context.Context, kubeClient kubernetes.Interface, opts
 		cache.ResourceEventHandlerFuncs{AddFunc: dns.Add, UpdateFunc: dns.Update, DeleteFunc: dns.Delete},
 		cache.Indexers{svcNameNamespaceIndex: svcNameNamespaceIndexFunc, svcIPIndex: svcIPIndexFunc},
 		object.DefaultProcessor(object.ToService(opts.skipAPIObjectsCleanup)),
+	)
+
+	dns.ingLister, dns.ingController = object.NewIndexerInformer(
+		&cache.ListWatch{
+			ListFunc:  ingressListFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
+			WatchFunc: ingressWatchFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
+		},
+		&ext.Ingress{},
+		cache.ResourceEventHandlerFuncs{AddFunc: dns.Add, UpdateFunc: dns.Update, DeleteFunc: dns.Delete},
+		cache.Indexers{ingNameNamespaceIndex: ingNameNamespaceIndexFunc, ingHostIndex: ingHostIndexFunc},
+		object.DefaultProcessor(object.ToIngress(opts.skipAPIObjectsCleanup)),
 	)
 
 	if opts.initPodCache {
@@ -237,12 +256,34 @@ func svcIPIndexFunc(obj interface{}) ([]string, error) {
 	return append([]string{svc.ClusterIP}, svc.ExternalIPs...), nil
 }
 
+func ingHostIndexFunc(obj interface{}) ([]string, error) {
+	ing, ok := obj.(*object.Ingress)
+	if !ok {
+		return nil, errObj
+	}
+
+	hosts := []string{}
+	for _, host := range ing.Hosts {
+		hosts = append(hosts, host)
+	}
+
+	return hosts, nil
+}
+
 func svcNameNamespaceIndexFunc(obj interface{}) ([]string, error) {
 	s, ok := obj.(*object.Service)
 	if !ok {
 		return nil, errObj
 	}
 	return []string{s.Index}, nil
+}
+
+func ingNameNamespaceIndexFunc(obj interface{}) ([]string, error) {
+	i, ok := obj.(*object.Ingress)
+	if !ok {
+		return nil, errObj
+	}
+	return []string{i.Index}, nil
 }
 
 func epNameNamespaceIndexFunc(obj interface{}) ([]string, error) {
@@ -267,6 +308,16 @@ func serviceListFunc(ctx context.Context, c kubernetes.Interface, ns string, s l
 			opts.LabelSelector = s.String()
 		}
 		listV1, err := c.CoreV1().Services(ns).List(ctx, opts)
+		return listV1, err
+	}
+}
+
+func ingressListFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(meta.ListOptions) (runtime.Object, error) {
+	return func(opts meta.ListOptions) (runtime.Object, error) {
+		if s != nil {
+			opts.LabelSelector = s.String()
+		}
+		listV1, err := c.ExtensionsV1beta1().Ingresses(ns).List(ctx, opts)
 		return listV1, err
 	}
 }
@@ -330,6 +381,9 @@ func (dns *dnsControl) Run() {
 	if dns.podController != nil {
 		go dns.podController.Run(dns.stopCh)
 	}
+	if dns.ingController != nil {
+		go dns.ingController.Run(dns.stopCh)
+	}
 	go dns.nsController.Run(dns.stopCh)
 	<-dns.stopCh
 }
@@ -345,8 +399,12 @@ func (dns *dnsControl) HasSynced() bool {
 	if dns.podController != nil {
 		c = dns.podController.HasSynced()
 	}
-	d := dns.nsController.HasSynced()
-	return a && b && c && d
+	d := true
+	if dns.ingController != nil {
+		d = dns.ingController.HasSynced()
+	}
+	e := dns.nsController.HasSynced()
+	return a && b && c && d && e
 }
 
 func (dns *dnsControl) ServiceList() (svcs []*object.Service) {
@@ -359,6 +417,18 @@ func (dns *dnsControl) ServiceList() (svcs []*object.Service) {
 		svcs = append(svcs, s)
 	}
 	return svcs
+}
+
+func (dns *dnsControl) IngressList() (ings []*object.Ingress) {
+	os := dns.ingLister.List()
+	for _, o := range os {
+		i, ok := o.(*object.Ingress)
+		if !ok {
+			continue
+		}
+		ings = append(ings, i)
+	}
+	return ings
 }
 
 func (dns *dnsControl) EndpointsList() (eps []*object.Endpoints) {
@@ -403,6 +473,21 @@ func (dns *dnsControl) SvcIndex(idx string) (svcs []*object.Service) {
 	return svcs
 }
 
+func (dns *dnsControl) IngIndex(idx string) (ings []*object.Ingress) {
+	os, err := dns.ingLister.ByIndex(ingNameNamespaceIndex, idx)
+	if err != nil {
+		return nil
+	}
+	for _, o := range os {
+		i, ok := o.(*object.Ingress)
+		if !ok {
+			continue
+		}
+		ings = append(ings, i)
+	}
+	return ings
+}
+
 func (dns *dnsControl) SvcIndexReverse(ip string) (svcs []*object.Service) {
 	os, err := dns.svcLister.ByIndex(svcIPIndex, ip)
 	if err != nil {
@@ -417,6 +502,22 @@ func (dns *dnsControl) SvcIndexReverse(ip string) (svcs []*object.Service) {
 		svcs = append(svcs, s)
 	}
 	return svcs
+}
+
+func (dns *dnsControl) IngIndexReverse(host string) (ings []*object.Ingress) {
+	os, err := dns.ingLister.ByIndex(ingHostIndex, host)
+	if err != nil {
+		return nil
+	}
+
+	for _, o := range os {
+		i, ok := o.(*object.Ingress)
+		if !ok {
+			continue
+		}
+		ings = append(ings, i)
+	}
+	return ings
 }
 
 func (dns *dnsControl) EpIndex(idx string) (ep []*object.Endpoints) {
@@ -488,6 +589,8 @@ func (dns *dnsControl) detectChanges(oldObj, newObj interface{}) {
 	}
 	switch ob := obj.(type) {
 	case *object.Service:
+		dns.updateModifed()
+	case *object.Ingress:
 		dns.updateModifed()
 	case *object.Pod:
 		dns.updateModifed()

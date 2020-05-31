@@ -19,6 +19,16 @@ func serviceWatchFunc(ctx context.Context, c kubernetes.Interface, ns string, s 
 	}
 }
 
+func ingressWatchFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(options meta.ListOptions) (watch.Interface, error) {
+	return func(options meta.ListOptions) (watch.Interface, error) {
+		if s != nil {
+			options.LabelSelector = s.String()
+		}
+		w, err := c.ExtensionsV1beta1().Ingresses(ns).Watch(ctx, options)
+		return w, err
+	}
+}
+
 func podWatchFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(options meta.ListOptions) (watch.Interface, error) {
 	return func(options meta.ListOptions) (watch.Interface, error) {
 		if s != nil {
