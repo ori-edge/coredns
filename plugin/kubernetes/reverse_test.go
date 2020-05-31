@@ -15,14 +15,17 @@ import (
 
 type APIConnReverseTest struct{}
 
-func (APIConnReverseTest) HasSynced() bool                    { return true }
-func (APIConnReverseTest) Run()                               {}
-func (APIConnReverseTest) Stop() error                        { return nil }
-func (APIConnReverseTest) PodIndex(string) []*object.Pod      { return nil }
-func (APIConnReverseTest) EpIndex(string) []*object.Endpoints { return nil }
-func (APIConnReverseTest) EndpointsList() []*object.Endpoints { return nil }
-func (APIConnReverseTest) ServiceList() []*object.Service     { return nil }
-func (APIConnReverseTest) Modified() int64                    { return 0 }
+func (APIConnReverseTest) HasSynced() bool                          { return true }
+func (APIConnReverseTest) Run()                                     {}
+func (APIConnReverseTest) Stop() error                              { return nil }
+func (APIConnReverseTest) PodIndex(string) []*object.Pod            { return nil }
+func (APIConnReverseTest) EpIndex(string) []*object.Endpoints       { return nil }
+func (APIConnReverseTest) EndpointsList() []*object.Endpoints       { return nil }
+func (APIConnReverseTest) ServiceList() []*object.Service           { return nil }
+func (APIConnReverseTest) IngressList() []*object.Ingress           { return nil }
+func (APIConnReverseTest) IngIndex(string) []*object.Ingress        { return nil }
+func (APIConnReverseTest) IngIndexReverse(string) []*object.Ingress { return nil }
+func (APIConnReverseTest) Modified() int64                          { return 0 }
 
 func (APIConnReverseTest) SvcIndex(svc string) []*object.Service {
 	if svc != "svc1.testns" {

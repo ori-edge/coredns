@@ -175,6 +175,9 @@ func (external) EndpointsList() []*object.Endpoints                             
 func (external) GetNodeByName(ctx context.Context, name string) (*api.Node, error) { return nil, nil }
 func (external) SvcIndex(s string) []*object.Service                               { return svcIndexExternal[s] }
 func (external) PodIndex(string) []*object.Pod                                     { return nil }
+func (external) IngressList() []*object.Ingress                                    { return nil }
+func (external) IngIndex(string) []*object.Ingress                                 { return nil }
+func (external) IngIndexReverse(string) []*object.Ingress                          { return nil }
 
 func (external) GetNamespaceByName(name string) (*api.Namespace, error) {
 	return &api.Namespace{

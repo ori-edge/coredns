@@ -20,6 +20,9 @@ func (APIConnTest) PodIndex(string) []*object.Pod            { return nil }
 func (APIConnTest) SvcIndexReverse(string) []*object.Service { return nil }
 func (APIConnTest) EpIndex(string) []*object.Endpoints       { return nil }
 func (APIConnTest) EndpointsList() []*object.Endpoints       { return nil }
+func (APIConnTest) IngressList() []*object.Ingress           { return nil }
+func (APIConnTest) IngIndex(string) []*object.Ingress        { return nil }
+func (APIConnTest) IngIndexReverse(string) []*object.Ingress { return nil }
 func (APIConnTest) Modified() int64                          { return 0 }
 
 func (a APIConnTest) SvcIndex(s string) []*object.Service {
@@ -103,7 +106,9 @@ func (APIConnTest) EpIndexReverse(ip string) []*object.Endpoints {
 	return eps
 }
 
-func (APIConnTest) GetNodeByName(ctx context.Context, name string) (*api.Node, error) { return &api.Node{}, nil }
+func (APIConnTest) GetNodeByName(ctx context.Context, name string) (*api.Node, error) {
+	return &api.Node{}, nil
+}
 func (APIConnTest) GetNamespaceByName(name string) (*api.Namespace, error) {
 	return &api.Namespace{}, nil
 }
