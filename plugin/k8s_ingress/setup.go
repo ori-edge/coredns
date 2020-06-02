@@ -1,4 +1,4 @@
-package external
+package ingress
 
 import (
 	"strconv"
@@ -10,12 +10,12 @@ import (
 	"github.com/caddyserver/caddy"
 )
 
-func init() { plugin.Register("k8s_external", setup) }
+func init() { plugin.Register("k8s_ingress", setup) }
 
 func setup(c *caddy.Controller) error {
 	e, err := parse(c)
 	if err != nil {
-		return plugin.Error("k8s_external", err)
+		return plugin.Error("k8s_ingress", err)
 	}
 
 	// Do this in OnStartup, so all plugins have been initialized.
@@ -24,9 +24,9 @@ func setup(c *caddy.Controller) error {
 		if m == nil {
 			return nil
 		}
-		if x, ok := m.(Externaler); ok {
-			e.externalFunc = x.External
-			e.externalAddrFunc = x.ExternalAddress
+		if x, ok := m.(Ingresser); ok {
+			e.externalFunc = x.ExternalIngress
+			e.externalAddrFunc = x.ExternalIngressAddress
 		}
 		return nil
 	})
@@ -41,7 +41,7 @@ func setup(c *caddy.Controller) error {
 	return nil
 }
 
-func parse(c *caddy.Controller) (*External, error) {
+func parse(c *caddy.Controller) (*Ingress, error) {
 	e := New()
 
 	for c.Next() { // external

@@ -525,6 +525,9 @@ func (APIConnServeTest) Run()                                      {}
 func (APIConnServeTest) Stop() error                               { return nil }
 func (APIConnServeTest) EpIndexReverse(string) []*object.Endpoints { return nil }
 func (APIConnServeTest) SvcIndexReverse(string) []*object.Service  { return nil }
+func (APIConnServeTest) IngIndex(string) []*object.Ingress         { return nil }
+func (APIConnServeTest) IngIndexReverse(string) []*object.Ingress  { return nil }
+func (APIConnServeTest) IngressList() []*object.Ingress            { return nil }
 func (APIConnServeTest) Modified() int64                           { return time.Now().Unix() }
 
 func (APIConnServeTest) PodIndex(ip string) []*object.Pod {

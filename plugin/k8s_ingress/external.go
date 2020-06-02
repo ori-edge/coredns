@@ -1,5 +1,5 @@
 /*
-Package external implements external names for kubernetes clusters.
+Package ingress implements ingress names for kubernetes clusters.
 
 This plugin only handles three qtypes (except the apex queries, because those are handled
 differently). We support A, AAAA and SRV request, for all other types we return NODATA or
@@ -9,7 +9,7 @@ A plugin willing to provide these services must implement the Externaler interfa
 likely only makes sense for the *kubernetes* plugin.
 
 */
-package external
+package ingress
 
 import (
 	"context"
@@ -22,17 +22,17 @@ import (
 	"github.com/miekg/dns"
 )
 
-// Externaler defines the interface that a plugin should implement in order to be used by External.
-type Externaler interface {
+// Ingresser defines the interface that a plugin should implement in order to be used by External.
+type Ingresser interface {
 	// External returns a slice of msg.Services that are looked up in the backend and match
 	// the request.
-	External(request.Request) ([]msg.Service, int)
+	ExternalIngress(request.Request) ([]msg.Service, int)
 	// ExternalAddress should return a string slice of addresses for the nameserving endpoint.
-	ExternalAddress(state request.Request) []dns.RR
+	ExternalIngressAddress(state request.Request) []dns.RR
 }
 
-// External resolves Ingress and Loadbalance IPs from kubernetes clusters.
-type External struct {
+// Ingress resolves Ingress and Loadbalance IPs from kubernetes clusters.
+type Ingress struct {
 	Next  plugin.Handler
 	Zones []string
 
@@ -47,13 +47,13 @@ type External struct {
 }
 
 // New returns a new and initialized *External.
-func New() *External {
-	e := &External{hostmaster: "hostmaster", ttl: 5, apex: "dns"}
+func New() *Ingress {
+	e := &Ingress{hostmaster: "hostmaster", ttl: 5, apex: "dns"}
 	return e
 }
 
 // ServeDNS implements the plugin.Handle interface.
-func (e *External) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+func (e *Ingress) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 
 	zone := plugin.Zones(e.Zones).Matches(state.Name())
@@ -96,8 +96,6 @@ func (e *External) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Ms
 		m.Answer = e.a(ctx, svc, state)
 	case dns.TypeAAAA:
 		m.Answer = e.aaaa(ctx, svc, state)
-	case dns.TypeSRV:
-		m.Answer, m.Extra = e.srv(svc, state)
 	default:
 		m.Ns = []dns.RR{e.soa(state)}
 	}
@@ -112,4 +110,4 @@ func (e *External) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Ms
 }
 
 // Name implements the Handler interface.
-func (e *External) Name() string { return "k8s_external" }
+func (e *Ingress) Name() string { return "k8s_external" }
