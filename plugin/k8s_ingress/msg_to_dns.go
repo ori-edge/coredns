@@ -14,9 +14,9 @@ func (e *Ingress) a(ctx context.Context, services []msg.Service, state request.R
 	for _, s := range services {
 
 		what, ip := s.HostType()
-		//fmt.Printf("\n Ingress Hostname: %s, Answer IP/Host: %s\n", s.Key, ip)
+		//log.Printf("\n Ingress Hostname: %s, Answer IP/Host: %s\n", s.Key, ip)
 		if !dns.IsSubDomain(dns.Fqdn(s.Key), state.QName()) {
-			//fmt.Println("Domain not matched, continuing")
+			//log.Println("Domain not matched, continuing")
 			continue
 		}
 

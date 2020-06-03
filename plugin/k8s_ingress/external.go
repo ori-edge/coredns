@@ -56,6 +56,7 @@ func New() *Ingress {
 func (e *Ingress) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 
+	//log.Printf("Service query %s", state.Name())
 	zone := plugin.Zones(e.Zones).Matches(state.Name())
 	if zone == "" {
 		return plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
@@ -64,7 +65,7 @@ func (e *Ingress) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	if e.externalFunc == nil {
 		return plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
 	}
-
+	//log.Printf("Found matching zone %s", zone)
 	state.Zone = zone
 	for _, z := range e.Zones {
 		// TODO(miek): save this in the External struct.
@@ -80,6 +81,7 @@ func (e *Ingress) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	}
 
 	svc, rcode := e.externalFunc(state)
+	//log.Printf("Retrieved ingresses %+v", svc)
 
 	m := new(dns.Msg)
 	m.SetReply(state.Req)
@@ -100,9 +102,9 @@ func (e *Ingress) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		m.Ns = []dns.RR{e.soa(state)}
 	}
 
-	// If we did have records, but queried for the wrong qtype return a nodata response.
+	// If we did have records, we have to continue to let other plugins pick it up.
 	if len(m.Answer) == 0 {
-		m.Ns = []dns.RR{e.soa(state)}
+		return plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
 	}
 
 	w.WriteMsg(m)
