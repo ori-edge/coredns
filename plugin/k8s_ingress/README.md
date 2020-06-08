@@ -6,15 +6,11 @@
 
 ## Description
 
-(networkop): TODO
-
-
 This plugin allows an additional zone to resolve the external IP address(es) of a Kubernetes
-service. This plugin is only useful if the *kubernetes* plugin is also loaded.
+Ingresses, similar to what `k8s_external` does for services. This plugin is only useful if the *kubernetes* plugin is also loaded.
 
 The plugin uses an external zone to resolve in-cluster IP addresses. It only handles queries for A,
-AAAA and SRV records; all others result in NODATA responses. To make it a proper DNS zone, it handles
-SOA and NS queries for the apex of the zone.
+AAAA; all others result in NODATA responses. To make it a proper DNS zone, it handles SOA and NS queries for the apex of the zone.
 
 By default the apex of the zone will look like the following (assuming the zone used is `example.org`):
 
@@ -71,27 +67,27 @@ Enable names under `example.org` to be resolved to in-cluster DNS addresses.
 }
 ~~~
 
-With the Corefile above, the following Service will get an `A` record for `test.default.example.org` with the IP address `192.168.200.123`.
+With the Corefile above, the following Ingress will get an `A` record for `test.example.org` with the IP address `192.168.200.123`.
 
 ~~~
-apiVersion: v1
-kind: Service
+apiVersion: extensions/v1beta1
+kind: Ingress
 metadata:
  name: test
  namespace: default
 spec:
- clusterIP: None
- externalIPs:
- - 192.168.200.123
- type: ClusterIP
+  rules:
+  - host: test.example.org
+    http:
+      paths:
+      - backend:
+          serviceName: backend-service
+          servicePort: 80
+        path: /
+status:
+  loadBalancer:
+    ingress:
+    - ip: 192.168.200.123
 ~~~
 
 
-# Also See
-
-For some background see [resolve external IP address](https://github.com/kubernetes/dns/issues/242).
-And [A records for services with Load Balancer IP](https://github.com/coredns/coredns/issues/1851).
-
-# Bugs
-
-PTR queries for the reverse zone is not supported.
